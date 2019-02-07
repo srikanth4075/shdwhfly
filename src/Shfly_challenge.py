@@ -1,22 +1,33 @@
 from datetime import datetime
-import re
+from functools import reduce
+import re, os, sys, json
+
 
 class BaseEvent(object):
+    """
+    this is the base event class that all other events must extend
+    """
 
-    def _init_(self, event, keys):
+    def __init__(self, event, keys):
+        """
+        constructor
+        :param event: event object
+        :param keys: list of keys to expect in the event object
+        :return:
+        """
         self.key = event['key']
         self.event_time = datetime.strptime(event['event_time'][:19], '%Y-%m-%dT%H:%M:%S')
         self._validate_event(event, keys)
         self.event = event
 
-    def _repr_(self):
+    def __repr__(self):
         return str(self.event)
 
     @staticmethod
     def _validate_event(event, keys):
         """
-        :param event:
-        :param keys:
+        :param event: event object
+        :param keys: list of keys in the input object to be read
         :return: True if all keys are found in event else False
         """
         assert reduce(lambda it1, it2: it1 and it2, [x in event for x in list(set(["key", "event_time"] + keys))],
@@ -25,8 +36,14 @@ class BaseEvent(object):
 
 class Customer(BaseEvent):
 
-    def _init_(self, event):
-        super(Customer, self)._init_(event, ["last_name", "adr_city", "adr_state"])
+    def __init__(self, event, keys=["last_name", "adr_city", "adr_state"]):
+        """
+
+        :param event: event object
+        :param keys: list of keys in the input object to be read
+        :return:
+        """
+        super(Customer, self)._init_(event, keys)
         self.last_name = event['last_name']
         self.adr_city = event['adr_city']
         self.adr_state = event['adr_state']
@@ -34,16 +51,28 @@ class Customer(BaseEvent):
 
 class SiteVisit(BaseEvent):
 
-    def _init_(self, event):
-        super(SiteVisit, self)._init_(event, ['customer_id', 'tags'])
+    def __init__(self, event, keys=['customer_id', 'tags']):
+        """
+
+        :param event: event object
+        :param keys: list of keys in the input object to be read
+        :return:
+        """
+        super(SiteVisit, self)._init_(event, keys)
         self.customer_id = event['customer_id']
         self.tags = event['tags']
 
 
 class ImageUpload(BaseEvent):
 
-    def _init_(self, event):
-        super(ImageUpload, self)._init_(event, ['customer_id', 'camera_make', 'camera_model'])
+    def __init__(self, event, keys=['customer_id', 'camera_make', 'camera_model']):
+        """
+
+        :param event: event object
+        :param keys: list of keys in the input object to be read
+        :return:
+        """
+        super(ImageUpload, self)._init_(event, keys)
         self.customer_id = event['customer_id']
         self.camera_make = event['camera_make']
         self.camera_model = event['camera_model']
@@ -51,55 +80,103 @@ class ImageUpload(BaseEvent):
 
 class Order(BaseEvent):
 
-    def _init_(self, event):
-        super(Order, self)._init_(event, ['customer_id', 'total_amount'])
+    def __init__(self, event, keys=['customer_id', 'total_amount']):
+        """
+
+        :param event: event object
+        :param keys: list of keys in the input object to be read
+        :return:
+        """
+        super(Order, self)._init_(event, keys)
         self.customer_id = event['customer_id']
         self.total_amount = Order._parse_total_amount(event['total_amount'])
 
     @staticmethod
-    def _parse_total_amount(str):
-        return int(re.compile('\d+').findall(str)[0])
+    def _parse_total_amount(in_str):
+        num, decimal = re.compile(r'([\d]+)(\.[0-9]+)?').findall(in_str)[0]
+        if decimal:
+            return float('%s%s' % (num, decimal))
+        else:
+            return int(num)
 
 
 class DataStore(object):
 
-    def _init_(self):
+    def __init__(self):
         self._customers = {}
         self._site_visits = {}
         self._image_uploads = {}
         self._orders = {}
 
-    def _repr_(self):
+    def __repr__(self):
         return str({"customer": self._customers, "site_visits": self._site_visits,
-                "image_upload": self._image_uploads, "orders": self._orders})
+                    "image_upload": self._image_uploads, "orders": self._orders})
 
     def get_customers(self):
+        """
+
+        :return: list of customer
+        """
         return self._customers.values()
 
     def get_site_visits(self, customer_id):
+        """
+
+        :param customer_id: customer id
+        :return: list of site-visits for the given customer
+        """
         return self._site_visits.get(customer_id, [])
 
     def get_orders(self, customer_id):
+        """
+
+        :param customer_id: customer id
+        :return: liist of orders for the given customer
+        """
         return self._orders.get(customer_id, [])
 
     def add_customer(self, event):
-        isinstance(event, Customer), "event must be of type Customer"
+        """
+        ingest new customer
+        :param event: customer event object
+        """
+        assert isinstance(event, Customer), "event must be of type Customer"
         self._customers[event.key] = event
 
     def add_site_visit(self, event):
+        """
+        ingest new site visit object
+        :param event:
+        """
         isinstance(event, SiteVisit), "event must be of type SiteVisit"
         self._site_visits[event.customer_id] = self._site_visits.get(event.customer_id, []) + [event]
 
     def add_image_uploads(self, event):
+        """
+        ingest new image upload object
+        :param event:
+        :return:
+        """
         isinstance(event, ImageUpload), "event must be of type ImageUpload"
         self._image_uploads[event.customer_id] = self._image_uploads.get(event.customer_id, []) + [event]
 
     def add_order(self, event):
+        """
+        ingest new order event
+        :param event:
+        :return:
+        """
         isinstance(event, Order), "event must be of type Order"
         self._orders[event.customer_id] = self._orders.get(event.customer_id, []) + [event]
 
 
 def ingest(event, data_store):
+    """
+    ingest event into data store
+    :param event: event object
+    :param data_store: data store
+    :return:
+    """
     assert 'type' in event, "type field is missing the event"
     if event['type'] == 'CUSTOMER':
         data_store.add_customer(Customer(event))
@@ -114,11 +191,24 @@ def ingest(event, data_store):
 
 
 def topXSimpleLTVCustomers(x, data_store):
-    result = sorted([(x, calculateLTV(data_store.get_site_visits(x.key), data_store.get_orders(x.key))) for x in
-                   data_store.get_customers()], key=lambda x: x[1])
-    return result
+    """
+
+    :param x: no of customers to return
+    :param data_store:
+    :return:
+    """
+    result = sorted([(c, calculateLTV(data_store.get_site_visits(c.key), data_store.get_orders(c.key))) for c in
+                     data_store.get_customers()], key=lambda ob: ob[1])
+    return map(lambda y: y[0], result)[:x]
+
 
 def calculateLTV(site_visits, orders):
+    """
+    
+    :param site_visits: list of site visits for a customer
+    :param orders: list of orders for a customer
+    :return: calculated LTV
+    """
     AVERAGE_LIFE_SPAN_IN_WEEKS = 520
 
     def bucket_week_data(data):
@@ -130,3 +220,20 @@ def calculateLTV(site_visits, orders):
     avg_visit_per_week = sum(site_visits_per_week.values()) / len(site_visits_per_week)
     exp_per_visit = sum([x.total_amount for x in orders]) / len(site_visits)
     return 52 * (exp_per_visit * avg_visit_per_week) * AVERAGE_LIFE_SPAN_IN_WEEKS
+
+
+if __name__ == '__main__':
+
+    with open(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_file_)))),'sample_inputs/events.txt')) as in_file:
+        data_store = DataStore()
+        events = json.load(in_file)
+        for item in events:
+            ingest(item, data_store)
+        assert len(data_store.get_customers()) == 1, "more than one customer detected"
+        last_name = data_store.get_customers()[0].last_name
+        assert last_name == 'Smith', "last name must be Smith but found %s" % last_name
+        total_amount = data_store.get_orders('96f55c7d8f42')[0].total_amount
+        assert total_amount == 12.34, "order total amt expected 12.34 USD but found %s" % total_amount
+        results = topXSimpleLTVCustomers(1, data_store)
+        assert len(results) == 1, 'topXSimpleLTVCustomers is returning right number of elements'
+        assert results[0].key == '96f55c7d8f42', 'expected customer id: 96f55c7d8f42 but found %s' % results[0].key
