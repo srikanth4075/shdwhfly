@@ -15,7 +15,7 @@ Before running the program please update the direcotry location of "events.txt" 
 Also,make sure you have read access to that "events.txt" file.
 
 Sample run of the program see below:
-
+```
 MacBook-Pro:src srmc$ python shfly.py
 Enter a Number to get top list: 5  <-- user inputs his top Value 5 of his choice
 Customer_key|Last_name
@@ -24,6 +24,7 @@ Customer_key|Last_name
 96f55c7d8f43|Ray
 96f55c7d8f46|Lucy
 96f55c7d8f40|Sam
+```
 
  
 
