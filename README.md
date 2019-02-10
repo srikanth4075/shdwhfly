@@ -11,7 +11,7 @@ Python 3 environment used and basic date time,json used in this program
 ## Running the Program
 
 When the program is invoked first it will ingest the data from "events.txt" file and asks user to input a Top value he intrested in.
-Before running the program please update the direcotry location of "events.txt" file in the src code file at line number 219.
+Before running the program please update the direcotry location of "events.txt" file in the [src code](https://github.com/srikanth4075/shdwhfly/blob/master/src/Shfly_challenge.py) file at line number 219.
 Also,make sure you have read access to that "events.txt" file.
 
 Sample run of the program see below:
